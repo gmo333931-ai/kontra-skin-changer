@@ -650,7 +650,78 @@ LP.CharacterAdded:Connect(function(char)
     if glowOn then MakeGlow(char) end
     if dmgFlashOn then HookDamageFlash(char) end
 end)
+-- ══════════════════════════════════════════
+--  HEAD DOT MARKERS (кружок над головой)
+-- ══════════════════════════════════════════
+local dotsOn = false
+local dotFolder = Instance.new("Folder")
+dotFolder.Name = "HeadDots"
+dotFolder.Parent = G
 
+local function AddDot(char, plr)
+    if plr == LP then return end
+    if not char then return end
+    local head = char:WaitForChild("Head", 5)
+    if not head then return end
+
+    -- Удаляем старый если есть
+    local old = head:FindFirstChild("DotGui")
+    if old then old:Destroy() end
+
+    local bb = Instance.new("BillboardGui")
+    bb.Name = "DotGui"
+    bb.Adornee = head
+    bb.Size = UDim2.fromOffset(12, 12)
+    bb.StudsOffset = Vector3.new(0, 2.5, 0)
+    bb.AlwaysOnTop = false  -- НЕ видно сквозь стены
+    bb.LightInfluence = 0
+    bb.Parent = head
+
+    local circle = Instance.new("Frame")
+    circle.Size = UDim2.new(1, 0, 1, 0)
+    circle.BackgroundColor3 = Color3.fromRGB(140, 85, 255)
+    circle.BorderSizePixel = 0
+    circle.Parent = bb
+
+    Instance.new("UICorner", circle).CornerRadius = UDim.new(1, 0)
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Thickness = 1
+    stroke.Color = Color3.fromRGB(255, 255, 255)
+    stroke.Transparency = 0.4
+    stroke.Parent = circle
+end
+
+local function RemoveDot(char)
+    if not char then return end
+    local head = char:FindFirstChild("Head")
+    if head then
+        local d = head:FindFirstChild("DotGui")
+        if d then d:Destroy() end
+    end
+end
+
+local function RemoveAllDots()
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LP and plr.Character then
+            RemoveDot(plr.Character)
+        end
+    end
+end
+
+local function SetupDotsForPlayer(plr)
+    if plr == LP then return end
+    plr.CharacterAdded:Connect(function(char)
+        task.wait(0.5)
+        if dotsOn then AddDot(char, plr) end
+    end)
+    if plr.Character and dotsOn then
+        AddDot(plr.Character, plr)
+    end
+end
+
+for _, plr in ipairs(Players:GetPlayers()) do SetupDotsForPlayer(plr) end
+Players.PlayerAdded:Connect(SetupDotsForPlayer)
 -- ══════════════════════════════════════════
 --  UNLOAD
 -- ══════════════════════════════════════════

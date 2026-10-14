@@ -1,6 +1,6 @@
 -- Context: Luau / Roblox Client Environment
 -- Target: Kontra (Roblox)
--- Description: Dark Glassmorphic Visuals Menu (Atmosphere, Fog, Particles, Effects)
+-- Description: Unified Hub (Visual Skin Changer + Atmosphere, Fog, Particles & UI)
 
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
@@ -9,10 +9,11 @@ local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
--- 1. Подготовка ScreenGui с защитой
+-- ==================== SCREEN GUI SETUP ====================
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "KontraVisualsUI"
+ScreenGui.Name = "KontraHubUI"
 ScreenGui.ResetOnSpawn = false
 
 if syn and syn.protect_gui then
@@ -24,13 +25,13 @@ else
     ScreenGui.Parent = CoreGui
 end
 
--- 2. Главный фрейм меню (Темный стеклянный стиль)
+-- Главное окно
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.fromOffset(360, 420)
+MainFrame.Size = UDim2.fromOffset(380, 460)
 MainFrame.Position = UDim2.fromScale(0.5, 0.5)
 MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
-MainFrame.BackgroundTransparency = 0.15
+MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+MainFrame.BackgroundTransparency = 0.1
 MainFrame.BorderSizePixel = 0
 MainFrame.Parent = ScreenGui
 
@@ -41,39 +42,37 @@ UICorner.Parent = MainFrame
 local UIStroke = Instance.new("UIStroke")
 UIStroke.Thickness = 1.5
 UIStroke.Color = Color3.fromRGB(130, 80, 255)
-UIStroke.Transparency = 0.3
+UIStroke.Transparency = 0.25
 UIStroke.Parent = MainFrame
 
--- Заголовок меню
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -20, 0, 45)
-Title.Position = UDim2.fromOffset(15, 5)
+Title.Size = UDim2.new(1, -20, 0, 35)
+Title.Position = UDim2.fromOffset(15, 8)
 Title.BackgroundTransparency = 1
-Title.Text = "KONTRA VISUALS"
+Title.Text = "KONTRA CLIENT HUB"
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 18
-Title.TextColor3 = Color3.fromRGB(240, 240, 255)
+Title.TextColor3 = Color3.fromRGB(245, 245, 255)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = MainFrame
 
 local Subtitle = Instance.new("TextLabel")
-Subtitle.Size = UDim2.new(1, -20, 0, 20)
-Subtitle.Position = UDim2.fromOffset(15, 30)
+Subtitle.Size = UDim2.new(1, -20, 0, 18)
+Subtitle.Position = UDim2.fromOffset(15, 34)
 Subtitle.BackgroundTransparency = 1
-Subtitle.Text = "Press [RightShift] to Toggle Menu"
+Subtitle.Text = "Skins & Visuals | Press [RightShift] to Toggle"
 Subtitle.Font = Enum.Font.Gotham
 Subtitle.TextSize = 11
-Subtitle.TextColor3 = Color3.fromRGB(150, 150, 170)
+Subtitle.TextColor3 = Color3.fromRGB(150, 150, 175)
 Subtitle.TextXAlignment = Enum.TextXAlignment.Left
 Subtitle.Parent = MainFrame
 
--- Скролл-список для опций
 local ScrollList = Instance.new("ScrollingFrame")
-ScrollList.Size = UDim2.new(1, -20, 1, -65)
-ScrollList.Position = UDim2.fromOffset(10, 55)
+ScrollList.Size = UDim2.new(1, -20, 1, -70)
+ScrollList.Position = UDim2.fromOffset(10, 60)
 ScrollList.BackgroundTransparency = 1
 ScrollList.BorderSizePixel = 0
-ScrollList.ScrollBarThickness = 3
+ScrollList.ScrollBarThickness = 4
 ScrollList.ScrollBarImageColor3 = Color3.fromRGB(130, 80, 255)
 ScrollList.Parent = MainFrame
 
@@ -82,7 +81,7 @@ UIListLayout.Padding = UDim.new(0, 8)
 UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 UIListLayout.Parent = ScrollList
 
--- Dragging (перемещение окна мышью)
+-- Dragging окна мышью
 local isDragging = false
 local dragStart, startPos
 MainFrame.InputBegan:Connect(function(input)
@@ -108,20 +107,20 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- Хоткей закрытия/открытия (Right Shift)
+-- Переключение меню на клавишу Right Shift
 UserInputService.InputBegan:Connect(function(input, gpe)
     if not gpe and input.KeyCode == Enum.KeyCode.RightShift then
         MainFrame.Visible = not MainFrame.Visible
     end
 end)
 
--- 3. Функция создания кнопки-переключателя (Toggle)
+-- Функция создания переключателя
 local function CreateToggle(name, defaultState, onToggle)
     local state = defaultState
 
     local Button = Instance.new("TextButton")
     Button.Size = UDim2.new(1, -10, 0, 42)
-    Button.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+    Button.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
     Button.BorderSizePixel = 0
     Button.Text = ""
     Button.AutoButtonColor = false
@@ -138,7 +137,7 @@ local function CreateToggle(name, defaultState, onToggle)
     Label.Text = name
     Label.Font = Enum.Font.GothamMedium
     Label.TextSize = 13
-    Label.TextColor3 = Color3.fromRGB(220, 220, 235)
+    Label.TextColor3 = Color3.fromRGB(225, 225, 240)
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = Button
 
@@ -179,27 +178,86 @@ local function CreateToggle(name, defaultState, onToggle)
     end
 end
 
+-- ==================== SKIN CHANGER МОДУЛЬ ====================
+local skinChangerActive = false
+
+-- Базовый конфиг скинов (Цвета, материалы и кастомные текстуры)
+local SkinPresets = {
+    NeonCyber = {
+        Color = Color3.fromRGB(255, 45, 120),
+        Material = Enum.Material.Neon
+    },
+    GalacticPurple = {
+        Color = Color3.fromRGB(140, 40, 255),
+        Material = Enum.Material.ForceField
+    },
+    GoldGlaze = {
+        Color = Color3.fromRGB(255, 200, 40),
+        Material = Enum.Material.SmoothPlastic
+    }
+}
+
+local currentPreset = SkinPresets.NeonCyber
+
+local function ApplySkin(weaponModel)
+    if not skinChangerActive or not weaponModel or not weaponModel:IsA("Model") then return end
+
+    for _, part in ipairs(weaponModel:GetDescendants()) do
+        if part:IsA("BasePart") and not part.Name:lower():find("arm") and not part.Name:lower():find("hand") then
+            part.Color = currentPreset.Color
+            part.Material = currentPreset.Material
+        end
+    end
+end
+
+-- Мониторинг оружия в камере
+Camera.ChildAdded:Connect(function(child)
+    if skinChangerActive then
+        task.wait(0.05)
+        ApplySkin(child)
+    end
+end)
+
+-- Тумблеры скинов в меню
+CreateToggle("Weapon Skin Changer (Neon Cyber)", false, function(enabled)
+    skinChangerActive = enabled
+    currentPreset = SkinPresets.NeonCyber
+    if enabled then
+        for _, child in ipairs(Camera:GetChildren()) do
+            ApplySkin(child)
+        end
+    end
+end)
+
+CreateToggle("Weapon Skin: Galaxy ForceField", false, function(enabled)
+    if enabled then
+        skinChangerActive = true
+        currentPreset = SkinPresets.GalacticPurple
+        for _, child in ipairs(Camera:GetChildren()) do
+            ApplySkin(child)
+        end
+    end
+end)
+
 -- ==================== ВИЗУАЛЬНЫЕ ЭФФЕКТЫ ====================
 
--- 1. Киберпанк / Неоновый туман (Atmosphere & Fog)
+-- Неоновый фиолетовый туман
 local AtmosphereInstance = nil
 local originalFogColor = Lighting.FogColor
 local originalFogEnd = Lighting.FogEnd
 
-CreateToggle("Cyberpunk Purple Fog", false, function(enabled)
+CreateToggle("Atmosphere & Fog", false, function(enabled)
     if enabled then
         Lighting.FogColor = Color3.fromRGB(45, 15, 80)
         Lighting.FogStart = 0
-        Lighting.FogEnd = 140
+        Lighting.FogEnd = 160
 
         if not AtmosphereInstance then
             AtmosphereInstance = Instance.new("Atmosphere")
-            AtmosphereInstance.Density = 0.45
-            AtmosphereInstance.Offset = 0.25
+            AtmosphereInstance.Density = 0.4
             AtmosphereInstance.Color = Color3.fromRGB(120, 50, 200)
             AtmosphereInstance.Decay = Color3.fromRGB(40, 10, 60)
-            AtmosphereInstance.Glare = 0.3
-            AtmosphereInstance.Haze = 2.5
+            AtmosphereInstance.Haze = 2
             AtmosphereInstance.Parent = Lighting
         end
     else
@@ -212,20 +270,20 @@ CreateToggle("Cyberpunk Purple Fog", false, function(enabled)
     end
 end)
 
--- 2. Кинематографичный Bloom & Blur
+-- Блум и мягкое размытие
 local BloomInstance = nil
 local BlurInstance = nil
 
-CreateToggle("Cinematic Bloom & Soft Blur", false, function(enabled)
+CreateToggle("Cinematic Bloom & Glow", false, function(enabled)
     if enabled then
         BloomInstance = Instance.new("BloomEffect")
-        BloomInstance.Intensity = 1.4
-        BloomInstance.Size = 24
+        BloomInstance.Intensity = 1.3
+        BloomInstance.Size = 22
         BloomInstance.Threshold = 0.8
         BloomInstance.Parent = Lighting
 
         BlurInstance = Instance.new("BlurEffect")
-        BlurInstance.Size = 2.5
+        BlurInstance.Size = 2
         BlurInstance.Parent = Lighting
     else
         if BloomInstance then BloomInstance:Destroy() BloomInstance = nil end
@@ -233,24 +291,9 @@ CreateToggle("Cinematic Bloom & Soft Blur", false, function(enabled)
     end
 end)
 
--- 3. Насыщенная цветокоррекция (ColorCorrection)
-local ColorCorrect = nil
-CreateToggle("Vibrant HDR Colors", false, function(enabled)
-    if enabled then
-        ColorCorrect = Instance.new("ColorCorrectionEffect")
-        ColorCorrect.Brightness = 0.05
-        ColorCorrect.Contrast = 0.25
-        ColorCorrect.Saturation = 0.4
-        ColorCorrect.TintColor = Color3.fromRGB(245, 240, 255)
-        ColorCorrect.Parent = Lighting
-    else
-        if ColorCorrect then ColorCorrect:Destroy() ColorCorrect = nil end
-    end
-end)
-
--- 4. Магические светящиеся партиклы вокруг персонажа
+-- Партиклы вокруг персонажа
 local activeEmitter = nil
-local function AttachParticles(char)
+local function SetupAura(char)
     if not char then return end
     local root = char:WaitForChild("HumanoidRootPart", 5)
     if not root then return end
@@ -258,52 +301,43 @@ local function AttachParticles(char)
     if activeEmitter then activeEmitter:Destroy() end
 
     activeEmitter = Instance.new("ParticleEmitter")
-    activeEmitter.Name = "CustomAuraParticles"
-    activeEmitter.Texture = "rbxassetid://243098098" -- Звездочки/светящиеся искры
+    activeEmitter.Name = "AuraParticles"
+    activeEmitter.Texture = "rbxassetid://243098098"
     activeEmitter.Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(180, 100, 255)),
         ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 200, 255))
     })
     activeEmitter.Size = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0.4),
+        NumberSequenceKeypoint.new(0, 0.35),
         NumberSequenceKeypoint.new(1, 0)
     })
-    activeEmitter.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0),
-        NumberSequenceKeypoint.new(1, 1)
-    })
-    activeEmitter.Lifetime = NumberRange.new(0.8, 1.5)
-    activeEmitter.Rate = 22
-    activeEmitter.Speed = NumberRange.new(1.5, 3.5)
+    activeEmitter.Lifetime = NumberRange.new(0.8, 1.4)
+    activeEmitter.Rate = 20
+    activeEmitter.Speed = NumberRange.new(1.2, 3.0)
     activeEmitter.SpreadAngle = Vector2.new(360, 360)
     activeEmitter.Parent = root
 end
 
-local particlesEnabled = false
+local auraEnabled = false
 CreateToggle("Starlight Character Aura", false, function(enabled)
-    particlesEnabled = enabled
+    auraEnabled = enabled
     if enabled then
-        if LocalPlayer.Character then
-            AttachParticles(LocalPlayer.Character)
-        end
+        if LocalPlayer.Character then SetupAura(LocalPlayer.Character) end
     else
-        if activeEmitter then
-            activeEmitter:Destroy()
-            activeEmitter = nil
-        end
+        if activeEmitter then activeEmitter:Destroy() activeEmitter = nil end
     end
 end)
 
 LocalPlayer.CharacterAdded:Connect(function(char)
-    if particlesEnabled then
+    if auraEnabled then
         task.wait(1)
-        AttachParticles(char)
+        SetupAura(char)
     end
 end)
 
--- 5. Ночной режим неба (Midnight Sky)
+-- Ночной режим
 local originalClockTime = Lighting.ClockTime
-CreateToggle("Midnight Moon Theme", false, function(enabled)
+CreateToggle("Night Mode (ClockTime 0)", false, function(enabled)
     if enabled then
         Lighting.ClockTime = 0
     else

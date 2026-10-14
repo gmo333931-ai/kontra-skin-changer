@@ -1,283 +1,380 @@
---[[
-    KONTRA CLIENT v4
-    No FOV (anti-kick), extended safe visuals
-]]
+-- Context: Luau / Roblox Client Environment
+-- Target: Kontra (Roblox)
+-- Description: Ultimate All-in-One Client Suite (Seasons, Particles, Skins, Head Dots, HUD & Movement)
 
-local Players      = game:GetService("Players")
-local Lighting     = game:GetService("Lighting")
-local Tween        = game:GetService("TweenService")
-local UIS          = game:GetService("UserInputService")
-local Run          = game:GetService("RunService")
-local CoreGui      = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local Lighting = game:GetService("Lighting")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
 
-local LP  = Players.LocalPlayer
-local Cam = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
-local O = {
-    FogC = Lighting.FogColor, FogS = Lighting.FogStart, FogE = Lighting.FogEnd,
-    Clock = Lighting.ClockTime, Bright = Lighting.Brightness, Shadow = Lighting.GlobalShadows,
+-- Сохранение оригинальных параметров мира
+local OriginalSettings = {
+    FogColor = Lighting.FogColor,
+    FogStart = Lighting.FogStart,
+    FogEnd = Lighting.FogEnd,
+    ClockTime = Lighting.ClockTime,
+    Brightness = Lighting.Brightness,
+    GlobalShadows = Lighting.GlobalShadows,
+    OutdoorAmbient = Lighting.OutdoorAmbient
 }
 
-local _C, _FX = {}, {}
-local function C(c) table.insert(_C, c) return c end
-local function AddFX(cls, p) local i = Instance.new(cls); for k,v in pairs(p) do i[k]=v end; i.Parent = Lighting; table.insert(_FX, i); return i end
-local function RemFX(i) if i then for x=#_FX,1,-1 do if _FX[x]==i then table.remove(_FX,x) end end; i:Destroy() end; return nil end
+-- Хранилище всех активных подключений для чистого Unload
+local Connections = {}
+local function TrackConnection(conn)
+    table.insert(Connections, conn)
+    return conn
+end
 
-pcall(function() if CoreGui:FindFirstChild("KontraV4") then CoreGui.KontraV4:Destroy() end end)
-
-local G = Instance.new("ScreenGui")
-G.Name = "KontraV4"; G.ResetOnSpawn = false; G.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+-- ==================== УДАЛЕНИЕ СТАРЫХ ВЕРСИЙ ====================
 pcall(function()
-    if syn and syn.protect_gui then syn.protect_gui(G); G.Parent = CoreGui
-    elseif gethui then G.Parent = gethui()
-    else G.Parent = CoreGui end
+    if CoreGui:FindFirstChild("KontraUltimateV5") then
+        CoreGui.KontraUltimateV5:Destroy()
+    end
 end)
-if not G.Parent then G.Parent = LP:WaitForChild("PlayerGui") end
 
-local T = {
-    bg = Color3.fromRGB(12,12,18), panel = Color3.fromRGB(18,18,26),
-    card = Color3.fromRGB(24,24,34), hover = Color3.fromRGB(32,32,44),
-    accent = Color3.fromRGB(120,75,255), accent2 = Color3.fromRGB(180,120,255),
-    dim = Color3.fromRGB(44,44,58), text = Color3.fromRGB(235,235,250),
-    sub = Color3.fromRGB(130,130,155), red = Color3.fromRGB(210,50,60),
+-- ==================== SCREENGUI SETUP ====================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "KontraUltimateV5"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+pcall(function()
+    if syn and syn.protect_gui then
+        syn.protect_gui(ScreenGui)
+        ScreenGui.Parent = CoreGui
+    elseif gethui then
+        ScreenGui.Parent = gethui()
+    else
+        ScreenGui.Parent = CoreGui
+    end
+end)
+
+if not ScreenGui.Parent then
+    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+end
+
+-- Палитра темы
+local Theme = {
+    Bg = Color3.fromRGB(15, 15, 22),
+    Panel = Color3.fromRGB(22, 22, 32),
+    Card = Color3.fromRGB(28, 28, 40),
+    CardHover = Color3.fromRGB(36, 36, 52),
+    Accent = Color3.fromRGB(140, 85, 255),
+    AccentGlow = Color3.fromRGB(190, 130, 255),
+    Dim = Color3.fromRGB(48, 48, 64),
+    Text = Color3.fromRGB(240, 240, 255),
+    SubText = Color3.fromRGB(145, 145, 175),
+    Red = Color3.fromRGB(220, 50, 65)
 }
 
--- ══════════════════════════════════════════
---  WATERMARK
--- ══════════════════════════════════════════
-local WM = Instance.new("Frame")
-WM.Size = UDim2.fromOffset(280,26); WM.Position = UDim2.fromOffset(12,12)
-WM.BackgroundColor3 = T.bg; WM.BackgroundTransparency = 0.15; WM.BorderSizePixel = 0; WM.Parent = G
-Instance.new("UICorner", WM).CornerRadius = UDim.new(0,6)
-local wms = Instance.new("UIStroke", WM); wms.Color = T.accent; wms.Transparency = 0.5
+-- ==================== 1. WATERMARK ====================
+local Watermark = Instance.new("Frame")
+Watermark.Size = UDim2.fromOffset(275, 28)
+Watermark.Position = UDim2.fromOffset(14, 14)
+Watermark.BackgroundColor3 = Theme.Bg
+Watermark.BackgroundTransparency = 0.15
+Watermark.BorderSizePixel = 0
+Watermark.Parent = ScreenGui
 
-local WMT = Instance.new("TextLabel")
-WMT.Size = UDim2.new(1,-14,1,0); WMT.Position = UDim2.fromOffset(8,0)
-WMT.BackgroundTransparency = 1; WMT.Font = Enum.Font.GothamMedium; WMT.TextSize = 11
-WMT.TextColor3 = T.text; WMT.TextXAlignment = Enum.TextXAlignment.Left
-WMT.Text = "KONTRA v4"; WMT.Parent = WM
+Instance.new("UICorner", Watermark).CornerRadius = UDim.new(0, 6)
+local WmStroke = Instance.new("UIStroke", Watermark)
+WmStroke.Color = Theme.Accent
+WmStroke.Transparency = 0.45
 
-local fc, fl = 0, os.clock()
-C(Run.RenderStepped:Connect(function()
-    fc = fc + 1; local n = os.clock()
-    if n - fl >= 1 then
-        local fps = fc; fc = 0; fl = n; local p = 0
-        pcall(function() p = math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()) end)
-        WMT.Text = string.format("KONTRA v4  |  %s  |  %d FPS  |  %dms", LP.DisplayName, fps, p)
+local WmText = Instance.new("TextLabel")
+WmText.Size = UDim2.new(1, -14, 1, 0)
+WmText.Position = UDim2.fromOffset(8, 0)
+WmText.BackgroundTransparency = 1
+WmText.Font = Enum.Font.GothamMedium
+WmText.TextSize = 11
+WmText.TextColor3 = Theme.Text
+WmText.TextXAlignment = Enum.TextXAlignment.Left
+WmText.Text = "KONTRA CLIENT v5 | INITIALIZING..."
+WmText.Parent = Watermark
+
+local fpsCounter = 0
+local lastFpsTime = os.clock()
+TrackConnection(RunService.RenderStepped:Connect(function()
+    fpsCounter = fpsCounter + 1
+    local now = os.clock()
+    if now - lastFpsTime >= 1 then
+        local fps = fpsCounter
+        fpsCounter = 0
+        lastFpsTime = now
+        local ping = 40
+        pcall(function()
+            ping = math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
+        end)
+        WmText.Text = string.format("KONTRA v5 | %s | %d FPS | %d ms", LocalPlayer.DisplayName, fps, ping)
     end
 end))
 
--- ══════════════════════════════════════════
---  TARGET HUD
--- ══════════════════════════════════════════
-local TH = Instance.new("Frame")
-TH.Size = UDim2.fromOffset(215,66); TH.Position = UDim2.new(0.5,-107,0.63,0)
-TH.BackgroundColor3 = T.bg; TH.BackgroundTransparency = 0.12; TH.BorderSizePixel = 0
-TH.Visible = false; TH.Parent = G
-Instance.new("UICorner", TH).CornerRadius = UDim.new(0,10)
-Instance.new("UIStroke", TH).Color = T.accent
+-- ==================== 2. TARGET HUD ====================
+local TargetHUD = Instance.new("Frame")
+TargetHUD.Size = UDim2.fromOffset(220, 68)
+TargetHUD.Position = UDim2.new(0.5, -110, 0.64, 0)
+TargetHUD.BackgroundColor3 = Theme.Bg
+TargetHUD.BackgroundTransparency = 0.15
+TargetHUD.BorderSizePixel = 0
+TargetHUD.Visible = false
+TargetHUD.Parent = ScreenGui
 
-local THAv = Instance.new("ImageLabel")
-THAv.Size = UDim2.fromOffset(40,40); THAv.Position = UDim2.fromOffset(10,13)
-THAv.BackgroundColor3 = T.card; THAv.BorderSizePixel = 0; THAv.Parent = TH
-Instance.new("UICorner", THAv).CornerRadius = UDim.new(0,6)
+Instance.new("UICorner", TargetHUD).CornerRadius = UDim.new(0, 10)
+local ThStroke = Instance.new("UIStroke", TargetHUD)
+ThStroke.Color = Theme.Accent
+ThStroke.Transparency = 0.35
 
-local THN = Instance.new("TextLabel")
-THN.Size = UDim2.new(1,-62,0,16); THN.Position = UDim2.fromOffset(56,10)
-THN.BackgroundTransparency = 1; THN.Font = Enum.Font.GothamBold; THN.TextSize = 12
-THN.TextColor3 = T.text; THN.TextXAlignment = Enum.TextXAlignment.Left
-THN.TextTruncate = Enum.TextTruncate.AtEnd; THN.Text = ""; THN.Parent = TH
+local TargetAvatar = Instance.new("ImageLabel")
+TargetAvatar.Size = UDim2.fromOffset(42, 42)
+TargetAvatar.Position = UDim2.fromOffset(10, 13)
+TargetAvatar.BackgroundColor3 = Theme.Card
+TargetAvatar.BorderSizePixel = 0
+TargetAvatar.Parent = TargetHUD
+Instance.new("UICorner", TargetAvatar).CornerRadius = UDim.new(0, 6)
 
-local THI = Instance.new("TextLabel")
-THI.Size = UDim2.new(1,-62,0,12); THI.Position = UDim2.fromOffset(56,26)
-THI.BackgroundTransparency = 1; THI.Font = Enum.Font.Gotham; THI.TextSize = 10
-THI.TextColor3 = T.sub; THI.TextXAlignment = Enum.TextXAlignment.Left; THI.Text = ""; THI.Parent = TH
+local TargetName = Instance.new("TextLabel")
+TargetName.Size = UDim2.new(1, -66, 0, 16)
+TargetName.Position = UDim2.fromOffset(58, 10)
+TargetName.BackgroundTransparency = 1
+TargetName.Font = Enum.Font.GothamBold
+TargetName.TextSize = 12
+TargetName.TextColor3 = Theme.Text
+TargetName.TextXAlignment = Enum.TextXAlignment.Left
+TargetName.TextTruncate = Enum.TextTruncate.AtEnd
+TargetName.Text = ""
+TargetName.Parent = TargetHUD
 
-local THBg = Instance.new("Frame")
-THBg.Size = UDim2.new(1,-66,0,6); THBg.Position = UDim2.fromOffset(56,44)
-THBg.BackgroundColor3 = T.dim; THBg.BorderSizePixel = 0; THBg.Parent = TH
-Instance.new("UICorner", THBg).CornerRadius = UDim.new(1,0)
+local TargetDist = Instance.new("TextLabel")
+TargetDist.Size = UDim2.new(1, -66, 0, 14)
+TargetDist.Position = UDim2.fromOffset(58, 26)
+TargetDist.BackgroundTransparency = 1
+TargetDist.Font = Enum.Font.Gotham
+TargetDist.TextSize = 10
+TargetDist.TextColor3 = Theme.SubText
+TargetDist.TextXAlignment = Enum.TextXAlignment.Left
+TargetDist.Text = ""
+TargetDist.Parent = TargetHUD
 
-local THF = Instance.new("Frame")
-THF.Size = UDim2.new(1,0,1,0); THF.BackgroundColor3 = T.accent; THF.BorderSizePixel = 0; THF.Parent = THBg
-Instance.new("UICorner", THF).CornerRadius = UDim.new(1,0)
+local HealthBg = Instance.new("Frame")
+HealthBg.Size = UDim2.new(1, -68, 0, 6)
+HealthBg.Position = UDim2.fromOffset(58, 46)
+HealthBg.BackgroundColor3 = Theme.Dim
+HealthBg.BorderSizePixel = 0
+HealthBg.Parent = TargetHUD
+Instance.new("UICorner", HealthBg).CornerRadius = UDim.new(1, 0)
 
-local thOn, thC = true, nil
-C(Run.RenderStepped:Connect(function()
-    if not thOn then TH.Visible = false return end
-    local o = Cam.CFrame.Position; local d = Cam.CFrame.LookVector * 300
-    local rp = RaycastParams.new(); rp.FilterType = Enum.RaycastFilterType.Exclude
-    if LP.Character then rp.FilterDescendantsInstances = {LP.Character} end
-    local r = workspace:Raycast(o, d, rp); local fp = nil
-    if r and r.Instance then
-        for _,pl in ipairs(Players:GetPlayers()) do
-            if pl ~= LP and pl.Character and r.Instance:IsDescendantOf(pl.Character) then fp = pl break end
+local HealthFill = Instance.new("Frame")
+HealthFill.Size = UDim2.new(1, 0, 1, 0)
+HealthFill.BackgroundColor3 = Theme.Accent
+HealthFill.BorderSizePixel = 0
+HealthFill.Parent = HealthBg
+Instance.new("UICorner", HealthFill).CornerRadius = UDim.new(1, 0)
+
+local targetHudActive = true
+local cachedTarget = nil
+
+TrackConnection(RunService.RenderStepped:Connect(function()
+    if not targetHudActive then
+        TargetHUD.Visible = false
+        return
+    end
+
+    local origin = Camera.CFrame.Position
+    local dir = Camera.CFrame.LookVector * 280
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    if LocalPlayer.Character then
+        params.FilterDescendantsInstances = {LocalPlayer.Character}
+    end
+
+    local hit = workspace:Raycast(origin, dir, params)
+    local found = nil
+
+    if hit and hit.Instance then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character and hit.Instance:IsDescendantOf(p.Character) then
+                found = p
+                break
+            end
         end
     end
-    if fp and fp.Character then
-        local h = fp.Character:FindFirstChildOfClass("Humanoid")
-        local rt = fp.Character:FindFirstChild("HumanoidRootPart")
-        if h and h.Health > 0 and rt then
-            TH.Visible = true; THN.Text = fp.DisplayName
-            THI.Text = string.format("%d studs | %d HP", math.floor((rt.Position-o).Magnitude), math.floor(h.Health))
-            Tween:Create(THF, TweenInfo.new(0.1), {Size = UDim2.new(math.clamp(h.Health/h.MaxHealth,0,1),0,1,0)}):Play()
-            if thC ~= fp then thC = fp
-                task.spawn(function() pcall(function()
-                    THAv.Image = Players:GetUserThumbnailAsync(fp.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100)
-                end) end)
-            end return
+
+    if found and found.Character then
+        local hum = found.Character:FindFirstChildOfClass("Humanoid")
+        local root = found.Character:FindFirstChild("HumanoidRootPart")
+        if hum and hum.Health > 0 and root then
+            TargetHUD.Visible = true
+            TargetName.Text = found.DisplayName
+            local dist = math.floor((root.Position - origin).Magnitude)
+            TargetDist.Text = string.format("%d studs | %d HP", dist, math.floor(hum.Health))
+
+            local ratio = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+            TweenService:Create(HealthFill, TweenInfo.new(0.12), {Size = UDim2.new(ratio, 0, 1, 0)}):Play()
+
+            if cachedTarget ~= found then
+                cachedTarget = found
+                task.spawn(function()
+                    pcall(function()
+                        local thumb = Players:GetUserThumbnailAsync(found.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100)
+                        TargetAvatar.Image = thumb
+                    end)
+                end)
+            end
+            return
         end
     end
-    TH.Visible = false
+
+    TargetHUD.Visible = false
 end))
 
--- ══════════════════════════════════════════
---  SPECTATOR LIST
--- ══════════════════════════════════════════
-local SP = Instance.new("Frame")
-SP.Size = UDim2.fromOffset(170,95); SP.Position = UDim2.new(1,-190,0.4,0)
-SP.BackgroundColor3 = T.bg; SP.BackgroundTransparency = 0.15; SP.BorderSizePixel = 0
-SP.Visible = false; SP.Parent = G
-Instance.new("UICorner", SP).CornerRadius = UDim.new(0,8)
-Instance.new("UIStroke", SP).Color = T.accent
+-- ==================== 3. SPECTATOR LIST ====================
+local SpecFrame = Instance.new("Frame")
+SpecFrame.Size = UDim2.fromOffset(175, 95)
+SpecFrame.Position = UDim2.new(1, -195, 0.4, 0)
+SpecFrame.BackgroundColor3 = Theme.Bg
+SpecFrame.BackgroundTransparency = 0.15
+SpecFrame.BorderSizePixel = 0
+SpecFrame.Visible = false
+SpecFrame.Parent = ScreenGui
 
-local SPT = Instance.new("TextLabel")
-SPT.Size = UDim2.new(1,-10,0,20); SPT.Position = UDim2.fromOffset(8,3)
-SPT.BackgroundTransparency = 1; SPT.Font = Enum.Font.GothamBold; SPT.TextSize = 10
-SPT.TextColor3 = T.text; SPT.TextXAlignment = Enum.TextXAlignment.Left
-SPT.Text = "SPECTATORS (0)"; SPT.Parent = SP
+Instance.new("UICorner", SpecFrame).CornerRadius = UDim.new(0, 8)
+local SfStroke = Instance.new("UIStroke", SpecFrame)
+SfStroke.Color = Theme.Accent
+SfStroke.Transparency = 0.4
 
-local SPS = Instance.new("ScrollingFrame")
-SPS.Size = UDim2.new(1,-8,1,-24); SPS.Position = UDim2.fromOffset(4,22)
-SPS.BackgroundTransparency = 1; SPS.BorderSizePixel = 0; SPS.ScrollBarThickness = 2; SPS.Parent = SP
-Instance.new("UIListLayout", SPS).Padding = UDim.new(0,2)
+local SfTitle = Instance.new("TextLabel")
+SfTitle.Size = UDim2.new(1, -10, 0, 22)
+SfTitle.Position = UDim2.fromOffset(8, 3)
+SfTitle.BackgroundTransparency = 1
+SfTitle.Font = Enum.Font.GothamBold
+SfTitle.TextSize = 11
+SfTitle.TextColor3 = Theme.Text
+SfTitle.TextXAlignment = Enum.TextXAlignment.Left
+SfTitle.Text = "SPECTATORS (0)"
+SfTitle.Parent = SpecFrame
+
+local SfScroll = Instance.new("ScrollingFrame")
+SfScroll.Size = UDim2.new(1, -8, 1, -26)
+SfScroll.Position = UDim2.fromOffset(4, 24)
+SfScroll.BackgroundTransparency = 1
+SfScroll.BorderSizePixel = 0
+SfScroll.ScrollBarThickness = 2
+SfScroll.Parent = SpecFrame
+
+local SfLayout = Instance.new("UIListLayout")
+SfLayout.Padding = UDim.new(0, 2)
+SfLayout.Parent = SfScroll
 
 task.spawn(function()
-    while G and G.Parent do
-        for _,ch in ipairs(SPS:GetChildren()) do if ch:IsA("TextLabel") then ch:Destroy() end end
-        local ct = 0
-        for _,pl in ipairs(Players:GetPlayers()) do
-            if pl ~= LP then
-                local sv = pl:FindFirstChild("Spectating") or pl:FindFirstChild("SpectateTarget")
-                if sv and (sv.Value == LP or sv.Value == LP.Character) then
-                    ct = ct + 1
-                    local r = Instance.new("TextLabel"); r.Size = UDim2.new(1,0,0,14); r.BackgroundTransparency = 1
-                    r.Font = Enum.Font.Gotham; r.TextSize = 10; r.TextColor3 = T.sub
-                    r.TextXAlignment = Enum.TextXAlignment.Left; r.Text = "  "..pl.DisplayName; r.Parent = SPS
+    while ScreenGui and ScreenGui.Parent do
+        for _, child in ipairs(SfScroll:GetChildren()) do
+            if child:IsA("TextLabel") then child:Destroy() end
+        end
+
+        local count = 0
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer then
+                local sv = p:FindFirstChild("Spectating") or p:FindFirstChild("SpectateTarget")
+                if sv and (sv.Value == LocalPlayer or sv.Value == LocalPlayer.Character) then
+                    count = count + 1
+                    local label = Instance.new("TextLabel")
+                    label.Size = UDim2.new(1, 0, 0, 15)
+                    label.BackgroundTransparency = 1
+                    label.Font = Enum.Font.Gotham
+                    label.TextSize = 10
+                    label.TextColor3 = Theme.SubText
+                    label.TextXAlignment = Enum.TextXAlignment.Left
+                    label.Text = "• " .. p.DisplayName
+                    label.Parent = SfScroll
                 end
             end
         end
-        SPT.Text = string.format("SPECTATORS (%d)", ct)
+        SfTitle.Text = string.format("SPECTATORS (%d)", count)
         task.wait(1.5)
     end
 end)
 
--- ══════════════════════════════════════════
---  CUSTOM CROSSHAIR OVERLAY
--- ══════════════════════════════════════════
-local CrosshairFrame = Instance.new("Frame")
-CrosshairFrame.Size = UDim2.fromOffset(20, 20)
-CrosshairFrame.Position = UDim2.new(0.5, -10, 0.5, -10)
-CrosshairFrame.BackgroundTransparency = 1
-CrosshairFrame.Visible = false
-CrosshairFrame.Parent = G
+-- ==================== 4. HEAD DOTS (МАРКЕРЫ НАД ГОЛОВОЙ) ====================
+local headDotsActive = false
 
--- Центральная точка
-local dot = Instance.new("Frame")
-dot.Size = UDim2.fromOffset(4, 4)
-dot.Position = UDim2.fromOffset(8, 8)
-dot.BackgroundColor3 = T.accent
-dot.BorderSizePixel = 0
-dot.Parent = CrosshairFrame
-Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+local function CreateHeadDot(char, player)
+    if player == LocalPlayer or not char then return end
+    local head = char:WaitForChild("Head", 5)
+    if not head then return end
 
--- Линии крестика
-local function MakeLine(sx, sy, px, py)
-    local l = Instance.new("Frame")
-    l.Size = UDim2.fromOffset(sx, sy)
-    l.Position = UDim2.fromOffset(px, py)
-    l.BackgroundColor3 = T.accent
-    l.BorderSizePixel = 0
-    l.Parent = CrosshairFrame
-end
-MakeLine(2, 8, 9, -2)  -- верх
-MakeLine(2, 8, 9, 14)  -- низ
-MakeLine(8, 2, -2, 9)  -- лево
-MakeLine(8, 2, 14, 9)  -- право
+    local existing = head:FindFirstChild("ClientHeadDot")
+    if existing then existing:Destroy() end
 
--- ══════════════════════════════════════════
---  VIGNETTE OVERLAY
--- ══════════════════════════════════════════
-local Vignette = Instance.new("ImageLabel")
-Vignette.Size = UDim2.new(1, 0, 1, 0)
-Vignette.BackgroundTransparency = 1
-Vignette.Image = "rbxassetid://115339939" -- Стандартная виньетка
-Vignette.ImageColor3 = Color3.fromRGB(0, 0, 0)
-Vignette.ImageTransparency = 0.3
-Vignette.ScaleType = Enum.ScaleType.Stretch
-Vignette.Visible = false
-Vignette.Parent = G
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "ClientHeadDot"
+    billboard.Adornee = head
+    billboard.Size = UDim2.fromOffset(10, 10)
+    billboard.StudsOffset = Vector3.new(0, 2.2, 0)
+    billboard.AlwaysOnTop = false -- Не видно сквозь стены (безопасно)
+    billboard.LightInfluence = 0
+    billboard.Parent = head
 
--- ══════════════════════════════════════════
---  CRT SCANLINES OVERLAY
--- ══════════════════════════════════════════
-local Scanlines = Instance.new("ImageLabel")
-Scanlines.Size = UDim2.new(1, 0, 1, 0)
-Scanlines.BackgroundTransparency = 1
-Scanlines.Image = "rbxassetid://594768795" -- Паттерн сканлайнов
-Scanlines.ImageTransparency = 0.85
-Scanlines.ScaleType = Enum.ScaleType.Tile
-Scanlines.TileSize = UDim2.fromOffset(100, 4)
-Scanlines.Visible = false
-Scanlines.Parent = G
+    local dot = Instance.new("Frame")
+    dot.Size = UDim2.new(1, 0, 1, 0)
+    dot.BackgroundColor3 = Color3.fromRGB(150, 90, 255)
+    dot.BorderSizePixel = 0
+    dot.Parent = billboard
+    Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
 
--- ══════════════════════════════════════════
---  DAMAGE FLASH (красный экран при получении урона)
--- ══════════════════════════════════════════
-local DmgFlash = Instance.new("Frame")
-DmgFlash.Size = UDim2.new(1,0,1,0)
-DmgFlash.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-DmgFlash.BackgroundTransparency = 1
-DmgFlash.BorderSizePixel = 0
-DmgFlash.Visible = false
-DmgFlash.Parent = G
-
-local dmgFlashOn = false
-local function FlashDamage()
-    if not dmgFlashOn then return end
-    DmgFlash.Visible = true
-    DmgFlash.BackgroundTransparency = 0.6
-    Tween:Create(DmgFlash, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        BackgroundTransparency = 1
-    }):Play()
-    task.delay(0.45, function() DmgFlash.Visible = false end)
+    local stroke = Instance.new("UIStroke")
+    stroke.Thickness = 1
+    stroke.Color = Color3.fromRGB(255, 255, 255)
+    stroke.Transparency = 0.3
+    stroke.Parent = dot
 end
 
-local function HookDamageFlash(char)
-    if not char then return end
-    local hum = char:WaitForChild("Humanoid", 5)
-    if not hum then return end
-    local lastHP = hum.Health
-    hum.HealthChanged:Connect(function(newHP)
-        if newHP < lastHP then FlashDamage() end
-        lastHP = newHP
+local function ClearAllHeadDots()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character then
+            local head = p.Character:FindFirstChild("Head")
+            if head and head:FindFirstChild("ClientHeadDot") then
+                head.ClientHeadDot:Destroy()
+            end
+        end
+    end
+end
+
+for _, p in ipairs(Players:GetPlayers()) do
+    if p ~= LocalPlayer then
+        p.CharacterAdded:Connect(function(c)
+            task.wait(0.5)
+            if headDotsActive then CreateHeadDot(c, p) end
+        end)
+    end
+end
+
+Players.PlayerAdded:Connect(function(p)
+    p.CharacterAdded:Connect(function(c)
+        task.wait(0.5)
+        if headDotsActive then CreateHeadDot(c, p) end
     end)
-end
+end)
 
--- ══════════════════════════════════════════
---  BHOP (FIXED)
--- ══════════════════════════════════════════
-local bhopOn = false
-C(Run.Stepped:Connect(function()
-    if not bhopOn then return end
+-- ==================== 5. AUTO BUNNYHOP ====================
+local bhopActive = false
+
+TrackConnection(RunService.Stepped:Connect(function()
+    if not bhopActive then return end
     pcall(function()
-        if UIS:IsKeyDown(Enum.KeyCode.Space) then
-            local ch = LP.Character
-            if ch then
-                local hum = ch:FindFirstChildOfClass("Humanoid")
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            local char = LocalPlayer.Character
+            if char then
+                local hum = char:FindFirstChildOfClass("Humanoid")
                 if hum then
-                    local st = hum:GetState()
-                    if st == Enum.HumanoidStateType.Running or st == Enum.HumanoidStateType.Landed or st == Enum.HumanoidStateType.RunningNoPhysics then
+                    local state = hum:GetState()
+                    if state == Enum.HumanoidStateType.Running
+                    or state == Enum.HumanoidStateType.RunningNoPhysics
+                    or state == Enum.HumanoidStateType.Landed then
                         hum.Jump = true
                         hum:ChangeState(Enum.HumanoidStateType.Jumping)
                     end
@@ -287,76 +384,112 @@ C(Run.Stepped:Connect(function()
     end)
 end))
 
--- ══════════════════════════════════════════
---  SKIN CHANGER (FIXED)
--- ══════════════════════════════════════════
-local skinOn, discoOn = false, false
-local skinCol = Color3.fromRGB(255,45,120)
-local skinMat = Enum.Material.Neon
+-- ==================== 6. НАДЕЖНЫЙ СКИН ЧЕНДЖЕР ====================
+local skinActive = false
+local discoActive = false
+local currentSkinColor = Color3.fromRGB(255, 45, 120)
+local currentSkinMaterial = Enum.Material.Neon
 
-local function Paint(model, col, mat)
+local function PaintWeaponModel(model, col, mat)
     if not model then return end
     for _, p in ipairs(model:GetDescendants()) do
-        local nm = p.Name:lower()
-        local skip = nm:find("arm") or nm:find("hand") or nm:find("torso") or nm:find("head") or nm:find("leg") or nm:find("humanoid")
-        if not skip then
-            if p:IsA("BasePart") then p.Color = col; p.Material = mat
-                if p:IsA("MeshPart") and p.TextureID ~= "" then p.TextureID = "" end
+        local name = p.Name:lower()
+        local isLimb = name:find("arm") or name:find("hand") or name:find("torso")
+                    or name:find("head") or name:find("leg") or name:find("humanoid")
+
+        if not isLimb then
+            if p:IsA("BasePart") then
+                p.Color = col
+                p.Material = mat
+                if p:IsA("MeshPart") and p.TextureID ~= "" then
+                    p.TextureID = ""
+                end
             end
-            if p:IsA("SpecialMesh") then pcall(function() p.TextureId = "" end) end
-            if p:IsA("Decal") or p:IsA("Texture") then pcall(function() p.Transparency = 1 end) end
+            if p:IsA("SpecialMesh") then
+                pcall(function() p.TextureId = "" end)
+            end
+            if p:IsA("Decal") or p:IsA("Texture") then
+                pcall(function() p.Transparency = 1 end)
+            end
         end
     end
 end
 
-C(Cam.ChildAdded:Connect(function(ch) task.wait(0.08); if skinOn and not discoOn then Paint(ch, skinCol, skinMat) end end))
-C(Run.Heartbeat:Connect(function()
-    if skinOn and not discoOn then
-        for _, ch in ipairs(Cam:GetChildren()) do if ch:IsA("Model") then Paint(ch, skinCol, skinMat) end end
-    end
-end))
-C(Run.RenderStepped:Connect(function()
-    if discoOn then
-        local col = Color3.fromHSV((os.clock()*0.5)%1, 0.9, 1)
-        for _, ch in ipairs(Cam:GetChildren()) do Paint(ch, col, Enum.Material.Neon) end
+TrackConnection(Camera.ChildAdded:Connect(function(child)
+    task.wait(0.08)
+    if skinActive and not discoActive then
+        PaintWeaponModel(child, currentSkinColor, currentSkinMaterial)
     end
 end))
 
--- ══════════════════════════════════════════
---  2D FOOTSTEP ARROWS (FIXED)
--- ══════════════════════════════════════════
-local arrowOn = false
-local function MakeArrow(pos)
-    if not arrowOn then return end
-    local cx, cy = Cam.ViewportSize.X/2, Cam.ViewportSize.Y/2
-    local img = Instance.new("ImageLabel")
-    img.Size = UDim2.fromOffset(24,24); img.AnchorPoint = Vector2.new(0.5,0.5)
-    img.BackgroundTransparency = 1; img.Image = "rbxassetid://6034818372"
-    img.ImageColor3 = Color3.fromRGB(255,210,50); img.Parent = G
-    local t0 = os.clock(); local cn
-    cn = Run.RenderStepped:Connect(function()
-        local dt = os.clock()-t0
-        if dt >= 1 or not arrowOn then cn:Disconnect() img:Destroy() return end
-        local rel = Cam.CFrame:VectorToObjectSpace(pos - Cam.CFrame.Position)
-        local a = math.atan2(-rel.X, rel.Z)
-        img.Position = UDim2.fromOffset(cx + math.sin(a)*165, cy - math.cos(a)*165)
-        img.Rotation = math.deg(a) + 180; img.ImageTransparency = dt
+TrackConnection(RunService.Heartbeat:Connect(function()
+    if skinActive and not discoActive then
+        for _, child in ipairs(Camera:GetChildren()) do
+            if child:IsA("Model") then
+                PaintWeaponModel(child, currentSkinColor, currentSkinMaterial)
+            end
+        end
+    end
+end))
+
+TrackConnection(RunService.RenderStepped:Connect(function()
+    if discoActive then
+        local hue = (os.clock() * 0.5) % 1
+        local col = Color3.fromHSV(hue, 0.9, 1)
+        for _, child in ipairs(Camera:GetChildren()) do
+            PaintWeaponModel(child, col, Enum.Material.Neon)
+        end
+    end
+end))
+
+-- ==================== 7. 2D СТРЕЛКИ ШАГОВ (VELOCITY) ====================
+local footstepArrowsActive = false
+
+local function SpawnFootstepArrow(worldPos)
+    if not footstepArrowsActive then return end
+    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+
+    local arrow = Instance.new("ImageLabel")
+    arrow.Size = UDim2.fromOffset(24, 24)
+    arrow.AnchorPoint = Vector2.new(0.5, 0.5)
+    arrow.BackgroundTransparency = 1
+    arrow.Image = "rbxassetid://6034818372"
+    arrow.ImageColor3 = Color3.fromRGB(255, 215, 60)
+    arrow.Parent = ScreenGui
+
+    local startTime = os.clock()
+    local conn
+    conn = RunService.RenderStepped:Connect(function()
+        local elapsed = os.clock() - startTime
+        if elapsed >= 1.1 or not footstepArrowsActive then
+            conn:Disconnect()
+            arrow:Destroy()
+            return
+        end
+
+        local rel = Camera.CFrame:VectorToObjectSpace(worldPos - Camera.CFrame.Position)
+        local angle = math.atan2(-rel.X, rel.Z)
+
+        arrow.Position = UDim2.fromOffset(screenCenter.X + math.sin(angle) * 165, screenCenter.Y - math.cos(angle) * 165)
+        arrow.Rotation = math.deg(angle) + 180
+        arrow.ImageTransparency = elapsed / 1.1
     end)
 end
 
 task.spawn(function()
-    while G and G.Parent do
-        task.wait(0.4)
-        if arrowOn then
-            for _, pl in ipairs(Players:GetPlayers()) do
-                if pl ~= LP and pl.Character then
-                    local root = pl.Character:FindFirstChild("HumanoidRootPart")
+    while ScreenGui and ScreenGui.Parent do
+        task.wait(0.38)
+        if footstepArrowsActive then
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Character then
+                    local root = p.Character:FindFirstChild("HumanoidRootPart")
                     if root then
                         local vel = root.AssemblyLinearVelocity
-                        local hz = Vector3.new(vel.X, 0, vel.Z).Magnitude
-                        if hz > 3 and math.abs(vel.Y) < 10 then
-                            if (root.Position - Cam.CFrame.Position).Magnitude <= 80 then
-                                MakeArrow(root.Position)
+                        local horizontalSpeed = Vector3.new(vel.X, 0, vel.Z).Magnitude
+                        if horizontalSpeed > 3.2 and math.abs(vel.Y) < 10 then
+                            local dist = (root.Position - Camera.CFrame.Position).Magnitude
+                            if dist <= 85 then
+                                SpawnFootstepArrow(root.Position)
                             end
                         end
                     end
@@ -366,22 +499,461 @@ task.spawn(function()
     end
 end)
 
--- ══════════════════════════════════════════
---  CHARACTER TRAIL
--- ══════════════════════════════════════════
-local trailOn = false
-local trailInst, trailA0, trailA1 = nil, nil, nil
+-- ==================== 8. ВИЗУАЛЬНЫЕ ЭФФЕКТЫ И СЕЗОНЫ ====================
+local LightingEffects = {}
+local function CreateLightingEffect(className, props)
+    local effect = Instance.new(className)
+    for k, v in pairs(props) do effect[k] = v end
+    effect.Parent = Lighting
+    table.insert(LightingEffects, effect)
+    return effect
+end
 
-local function MakeTrail(char)
+local function RemoveLightingEffect(effect)
+    if effect then
+        for i = #LightingEffects, 1, -1 do
+            if LightingEffects[i] == effect then
+                table.remove(LightingEffects, i)
+            end
+        end
+        effect:Destroy()
+    end
+    return nil
+end
+
+-- ==================== 9. ГЛАВНОЕ МЕНЮ ИНТЕРФЕЙСА ====================
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.fromOffset(350, 480)
+MainFrame.Position = UDim2.fromScale(0.5, 0.5)
+MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+MainFrame.BackgroundColor3 = Theme.Panel
+MainFrame.BackgroundTransparency = 0.08
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 14)
+local MfStroke = Instance.new("UIStroke", MainFrame)
+MfStroke.Thickness = 1.5
+MfStroke.Color = Theme.Accent
+MfStroke.Transparency = 0.2
+
+local TopGlow = Instance.new("Frame")
+TopGlow.Size = UDim2.new(1, -24, 0, 3)
+TopGlow.Position = UDim2.fromOffset(12, 8)
+TopGlow.BackgroundColor3 = Theme.Accent
+TopGlow.BorderSizePixel = 0
+TopGlow.Parent = MainFrame
+Instance.new("UICorner", TopGlow).CornerRadius = UDim.new(1, 0)
+
+local HeaderTitle = Instance.new("TextLabel")
+HeaderTitle.Size = UDim2.new(1, -24, 0, 24)
+HeaderTitle.Position = UDim2.fromOffset(14, 16)
+HeaderTitle.BackgroundTransparency = 1
+HeaderTitle.Text = "KONTRA CLIENT v5"
+HeaderTitle.Font = Enum.Font.GothamBold
+HeaderTitle.TextSize = 16
+HeaderTitle.TextColor3 = Theme.Text
+HeaderTitle.TextXAlignment = Enum.TextXAlignment.Left
+HeaderTitle.Parent = MainFrame
+
+local HeaderSub = Instance.new("TextLabel")
+HeaderSub.Size = UDim2.new(1, -24, 0, 14)
+HeaderSub.Position = UDim2.fromOffset(14, 38)
+HeaderSub.BackgroundTransparency = 1
+HeaderSub.Text = "[RightShift] Toggle  •  Seasons & Visuals Suite"
+HeaderSub.Font = Enum.Font.Gotham
+HeaderSub.TextSize = 10
+HeaderSub.TextColor3 = Theme.SubText
+HeaderSub.TextXAlignment = Enum.TextXAlignment.Left
+HeaderSub.Parent = MainFrame
+
+local ScrollList = Instance.new("ScrollingFrame")
+ScrollList.Size = UDim2.new(1, -16, 1, -64)
+ScrollList.Position = UDim2.fromOffset(8, 58)
+ScrollList.BackgroundTransparency = 1
+ScrollList.BorderSizePixel = 0
+ScrollList.ScrollBarThickness = 3
+ScrollList.ScrollBarImageColor3 = Theme.Accent
+ScrollList.Parent = MainFrame
+
+local ListLayout = Instance.new("UIListLayout")
+ListLayout.Padding = UDim.new(0, 4)
+ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ListLayout.Parent = ScrollList
+
+ListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ScrollList.CanvasSize = UDim2.new(0, 0, 0, ListLayout.AbsoluteContentSize.Y + 16)
+end)
+
+-- Dragging мышью
+local isDragging = false
+local dragStart, frameStart
+MainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isDragging = true
+        dragStart = input.Position
+        frameStart = MainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then isDragging = false end
+        end)
+    end
+end)
+
+TrackConnection(UserInputService.InputChanged:Connect(function(input)
+    if isDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(frameStart.X.Scale, frameStart.X.Offset + delta.X, frameStart.Y.Scale, frameStart.Y.Offset + delta.Y)
+    end
+end))
+
+TrackConnection(UserInputService.InputBegan:Connect(function(input, gpe)
+    if not gpe and input.KeyCode == Enum.KeyCode.RightShift then
+        MainFrame.Visible = not MainFrame.Visible
+    end
+end))
+
+-- Конструкторы UI
+local layoutOrder = 0
+local function NextOrder()
+    layoutOrder = layoutOrder + 1
+    return layoutOrder
+end
+
+local function CreateSection(title)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 22)
+    frame.BackgroundTransparency = 1
+    frame.LayoutOrder = NextOrder()
+    frame.Parent = ScrollList
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -8, 1, 0)
+    label.Position = UDim2.fromOffset(4, 0)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 10
+    label.TextColor3 = Theme.Accent
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Text = "━  " .. title:upper()
+    label.Parent = frame
+
+    local line = Instance.new("Frame")
+    line.Size = UDim2.new(1, -8, 0, 1)
+    line.Position = UDim2.new(0, 4, 1, -2)
+    line.BackgroundColor3 = Theme.Dim
+    line.BackgroundTransparency = 0.5
+    line.BorderSizePixel = 0
+    line.Parent = frame
+end
+
+local function CreateToggle(name, defaultState, callback)
+    local state = defaultState
+
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -4, 0, 34)
+    btn.BackgroundColor3 = Theme.Card
+    btn.BorderSizePixel = 0
+    btn.Text = ""
+    btn.AutoButtonColor = false
+    btn.LayoutOrder = NextOrder()
+    btn.Parent = ScrollList
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 7)
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -54, 1, 0)
+    lbl.Position = UDim2.fromOffset(10, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = name
+    lbl.Font = Enum.Font.GothamMedium
+    lbl.TextSize = 11
+    lbl.TextColor3 = Theme.Text
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = btn
+
+    local track = Instance.new("Frame")
+    track.Size = UDim2.fromOffset(32, 16)
+    track.Position = UDim2.new(1, -42, 0.5, -8)
+    track.BackgroundColor3 = state and Theme.Accent or Theme.Dim
+    track.BorderSizePixel = 0
+    track.Parent = btn
+    Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
+
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.fromOffset(12, 12)
+    knob.Position = state and UDim2.fromOffset(17, 2) or UDim2.fromOffset(3, 2)
+    knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    knob.BorderSizePixel = 0
+    knob.Parent = track
+    Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        TweenService:Create(track, TweenInfo.new(0.15), {
+            BackgroundColor3 = state and Theme.Accent or Theme.Dim
+        }):Play()
+        TweenService:Create(knob, TweenInfo.new(0.15), {
+            Position = state and UDim2.fromOffset(17, 2) or UDim2.fromOffset(3, 2)
+        }):Play()
+        pcall(callback, state)
+    end)
+
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = Theme.CardHover}):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = Theme.Card}):Play()
+    end)
+
+    if defaultState then pcall(callback, true) end
+end
+
+-- ==================== НАПОЛНЕНИЕ МЕНЮ ====================
+
+-- ─── СЕЗОНЫ ГОДА (НОВОЕ) ───
+CreateSection("Seasons & Weather")
+
+local winterAtmo = nil
+local winterColor = nil
+local snowEmitter = nil
+
+local function ToggleWinter(v)
+    if v then
+        Lighting.FogColor = Color3.fromRGB(200, 220, 245)
+        Lighting.FogStart = 0
+        Lighting.FogEnd = 140
+        Lighting.OutdoorAmbient = Color3.fromRGB(180, 205, 235)
+
+        winterAtmo = CreateLightingEffect("Atmosphere", {
+            Density = 0.45,
+            Color = Color3.fromRGB(195, 220, 245),
+            Decay = Color3.fromRGB(150, 180, 215),
+            Haze = 2.5
+        })
+        winterColor = CreateLightingEffect("ColorCorrectionEffect", {
+            TintColor = Color3.fromRGB(215, 235, 255),
+            Contrast = 0.15,
+            Saturation = -0.2
+        })
+
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            snowEmitter = Instance.new("ParticleEmitter")
+            snowEmitter.Name = "WinterSnow"
+            snowEmitter.Texture = "rbxassetid://243098098"
+            snowEmitter.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))
+            snowEmitter.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.25), NumberSequenceKeypoint.new(1, 0.1)})
+            snowEmitter.Lifetime = NumberRange.new(2, 3.5)
+            snowEmitter.Rate = 35
+            snowEmitter.Speed = NumberRange.new(3, 6)
+            snowEmitter.Acceleration = Vector3.new(0, -6, 0)
+            snowEmitter.SpreadAngle = Vector2.new(180, 180)
+            snowEmitter.Parent = char.HumanoidRootPart
+        end
+    else
+        Lighting.FogColor = OriginalSettings.FogColor
+        Lighting.FogStart = OriginalSettings.FogStart
+        Lighting.FogEnd = OriginalSettings.FogEnd
+        Lighting.OutdoorAmbient = OriginalSettings.OutdoorAmbient
+        winterAtmo = RemoveLightingEffect(winterAtmo)
+        winterColor = RemoveLightingEffect(winterColor)
+        if snowEmitter then snowEmitter:Destroy() snowEmitter = nil end
+    end
+end
+
+CreateToggle("Winter Frost & Snowfall", false, ToggleWinter)
+
+local springAtmo = nil
+local springColor = nil
+local sakuraEmitter = nil
+
+local function ToggleSpring(v)
+    if v then
+        Lighting.FogColor = Color3.fromRGB(255, 220, 235)
+        Lighting.FogStart = 10
+        Lighting.FogEnd = 200
+
+        springAtmo = CreateLightingEffect("Atmosphere", {
+            Density = 0.35,
+            Color = Color3.fromRGB(255, 210, 230),
+            Decay = Color3.fromRGB(220, 170, 200),
+            Haze = 1.8
+        })
+        springColor = CreateLightingEffect("ColorCorrectionEffect", {
+            TintColor = Color3.fromRGB(255, 240, 245),
+            Brightness = 0.04,
+            Saturation = 0.3,
+            Contrast = 0.1
+        })
+
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            sakuraEmitter = Instance.new("ParticleEmitter")
+            sakuraEmitter.Name = "SpringSakura"
+            sakuraEmitter.Texture = "rbxassetid://258128463" -- Мягкие розовые лепестки
+            sakuraEmitter.Color = ColorSequence.new(Color3.fromRGB(255, 175, 205))
+            sakuraEmitter.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 0.2)})
+            sakuraEmitter.Lifetime = NumberRange.new(2.5, 4)
+            sakuraEmitter.Rate = 22
+            sakuraEmitter.Speed = NumberRange.new(2, 4)
+            sakuraEmitter.Acceleration = Vector3.new(2, -3, 1)
+            sakuraEmitter.SpreadAngle = Vector2.new(180, 180)
+            sakuraEmitter.Parent = char.HumanoidRootPart
+        end
+    else
+        Lighting.FogColor = OriginalSettings.FogColor
+        Lighting.FogStart = OriginalSettings.FogStart
+        Lighting.FogEnd = OriginalSettings.FogEnd
+        springAtmo = RemoveLightingEffect(springAtmo)
+        springColor = RemoveLightingEffect(springColor)
+        if sakuraEmitter then sakuraEmitter:Destroy() sakuraEmitter = nil end
+    end
+end
+
+CreateToggle("Spring Blossom & Sakura", false, ToggleSpring)
+
+-- ─── СКИНЫ ОРУЖИЯ ───
+CreateSection("Weapon Skins")
+
+CreateToggle("Neon Cyber Pink", false, function(v)
+    skinActive = v; discoActive = false
+    currentSkinColor = Color3.fromRGB(255, 45, 120)
+    currentSkinMaterial = Enum.Material.Neon
+end)
+
+CreateToggle("Ice Diamond Crystal", false, function(v)
+    skinActive = v; discoActive = false
+    currentSkinColor = Color3.fromRGB(120, 220, 255)
+    currentSkinMaterial = Enum.Material.Glass
+end)
+
+CreateToggle("Gold Prestige", false, function(v)
+    skinActive = v; discoActive = false
+    currentSkinColor = Color3.fromRGB(255, 195, 40)
+    currentSkinMaterial = Enum.Material.SmoothPlastic
+end)
+
+CreateToggle("ForceField Galaxy", false, function(v)
+    skinActive = v; discoActive = false
+    currentSkinColor = Color3.fromRGB(140, 40, 255)
+    currentSkinMaterial = Enum.Material.ForceField
+end)
+
+CreateToggle("Lava Inferno", false, function(v)
+    skinActive = v; discoActive = false
+    currentSkinColor = Color3.fromRGB(255, 75, 20)
+    currentSkinMaterial = Enum.Material.Neon
+end)
+
+CreateToggle("Emerald Toxic", false, function(v)
+    skinActive = v; discoActive = false
+    currentSkinColor = Color3.fromRGB(35, 255, 75)
+    currentSkinMaterial = Enum.Material.Neon
+end)
+
+CreateToggle("Meme: RGB Rainbow Disco", false, function(v)
+    discoActive = v
+    if v then skinActive = false end
+end)
+
+-- ─── HUD И МАРКЕРЫ ───
+CreateSection("HUD & Markers")
+
+CreateToggle("Target HUD (Minecraft Style)", true, function(v) targetHudActive = v end)
+CreateToggle("Spectator List Window", false, function(v) SpecFrame.Visible = v end)
+CreateToggle("Watermark FPS / Ping", true, function(v) Watermark.Visible = v end)
+CreateToggle("2D Footstep Sound Arrows", false, function(v) footstepArrowsActive = v end)
+
+CreateToggle("Head Dot Markers (Dots)", false, function(v)
+    headDotsActive = v
+    if v then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character then
+                CreateHeadDot(p.Character, p)
+            end
+        end
+    else
+        ClearAllHeadDots()
+    end
+end)
+
+-- ─── ДВИЖЕНИЕ ───
+CreateSection("Movement")
+CreateToggle("Auto Bunnyhop (Hold Space)", false, function(v) bhopActive = v end)
+
+-- ─── АТМОСФЕРА И СВЕТ ───
+CreateSection("Lighting & Atmosphere")
+
+local atmoPurple = nil
+CreateToggle("Purple Cyberpunk Fog", false, function(v)
+    if v then
+        Lighting.FogColor = Color3.fromRGB(40, 12, 75)
+        Lighting.FogStart = 0
+        Lighting.FogEnd = 160
+        atmoPurple = CreateLightingEffect("Atmosphere", {Density = 0.4, Color = Color3.fromRGB(110, 45, 200), Haze = 2})
+    else
+        Lighting.FogColor = OriginalSettings.FogColor
+        Lighting.FogStart = OriginalSettings.FogStart
+        Lighting.FogEnd = OriginalSettings.FogEnd
+        atmoPurple = RemoveLightingEffect(atmoPurple)
+    end
+end)
+
+local bloomInst, blurInst = nil, nil
+CreateToggle("Cinematic Bloom & Glow", false, function(v)
+    if v then
+        bloomInst = CreateLightingEffect("BloomEffect", {Intensity = 1.3, Size = 22, Threshold = 0.8})
+        blurInst = CreateLightingEffect("BlurEffect", {Size = 2.5})
+    else
+        bloomInst = RemoveLightingEffect(bloomInst)
+        blurInst = RemoveLightingEffect(blurInst)
+    end
+end)
+
+local colorHdr = nil
+CreateToggle("Vibrant HDR Colors", false, function(v)
+    if v then
+        colorHdr = CreateLightingEffect("ColorCorrectionEffect", {Brightness = 0.04, Contrast = 0.22, Saturation = 0.45})
+    else
+        colorHdr = RemoveLightingEffect(colorHdr)
+    end
+end)
+
+local sunRaysInst = nil
+CreateToggle("Sun Rays (God Rays)", false, function(v)
+    if v then
+        sunRaysInst = CreateLightingEffect("SunRaysEffect", {Intensity = 0.12, Spread = 0.8})
+    else
+        sunRaysInst = RemoveLightingEffect(sunRaysInst)
+    end
+end)
+
+CreateToggle("Midnight Moon Theme", false, function(v)
+    Lighting.ClockTime = v and 0 or OriginalSettings.ClockTime
+end)
+
+CreateToggle("Fullbright (No Shadows)", false, function(v)
+    if v then
+        Lighting.Brightness = 3
+        Lighting.ClockTime = 12
+        Lighting.FogEnd = 100000
+        Lighting.GlobalShadows = false
+    else
+        Lighting.Brightness = OriginalSettings.Brightness
+        Lighting.ClockTime = OriginalSettings.ClockTime
+        Lighting.FogEnd = OriginalSettings.FogEnd
+        Lighting.GlobalShadows = OriginalSettings.GlobalShadows
+    end
+end)
+
+-- ─── ПАРТИКЛЫ И АУРЫ ───
+CreateSection("Auras & Trails")
+
+local trailInst, trailA0, trailA1 = nil, nil, nil
+local function MakePlayerTrail(char)
     if not char then return end
     local root = char:FindFirstChild("HumanoidRootPart")
-    local head = char:FindFirstChild("Head")
-    if not root or not head then return end
-
-    -- Убираем старый трейл
+    if not root then return end
     if trailInst then pcall(function() trailInst:Destroy() end) end
-    if trailA0 then pcall(function() trailA0:Destroy() end) end
-    if trailA1 then pcall(function() trailA1:Destroy() end) end
 
     trailA0 = Instance.new("Attachment"); trailA0.Position = Vector3.new(0, 0.5, 0); trailA0.Parent = root
     trailA1 = Instance.new("Attachment"); trailA1.Position = Vector3.new(0, -0.5, 0); trailA1.Parent = root
@@ -391,11 +963,7 @@ local function MakeTrail(char)
     trailInst.Attachment1 = trailA1
     trailInst.Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(140, 80, 255)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 180, 255)),
-    })
-    trailInst.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0.3),
-        NumberSequenceKeypoint.new(1, 1),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 180, 255))
     })
     trailInst.Lifetime = 0.5
     trailInst.MinLength = 0.1
@@ -403,348 +971,103 @@ local function MakeTrail(char)
     trailInst.Parent = root
 end
 
-local function KillTrail()
-    if trailInst then pcall(function() trailInst:Destroy() end) trailInst = nil end
-    if trailA0 then pcall(function() trailA0:Destroy() end) trailA0 = nil end
-    if trailA1 then pcall(function() trailA1:Destroy() end) trailA1 = nil end
-end
-
--- ══════════════════════════════════════════
---  POINTLIGHT GLOW
--- ══════════════════════════════════════════
-local glowOn = false
-local glowLight = nil
-local glowConn = nil
-
-local function MakeGlow(char)
-    if not char then return end
-    local root = char:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-    if glowLight then pcall(function() glowLight:Destroy() end) end
-
-    glowLight = Instance.new("PointLight")
-    glowLight.Color = T.accent
-    glowLight.Brightness = 2
-    glowLight.Range = 18
-    glowLight.Parent = root
-end
-
--- ══════════════════════════════════════════
---  MAIN MENU
--- ══════════════════════════════════════════
-local M = Instance.new("Frame")
-M.Size = UDim2.fromOffset(340,470); M.Position = UDim2.fromScale(0.5,0.5)
-M.AnchorPoint = Vector2.new(0.5,0.5); M.BackgroundColor3 = T.panel
-M.BackgroundTransparency = 0.06; M.BorderSizePixel = 0; M.Parent = G
-Instance.new("UICorner", M).CornerRadius = UDim.new(0,14)
-local mst = Instance.new("UIStroke", M); mst.Thickness = 1.4; mst.Color = T.accent; mst.Transparency = 0.2
-
-local bar = Instance.new("Frame")
-bar.Size = UDim2.new(1,-24,0,3); bar.Position = UDim2.fromOffset(12,8)
-bar.BackgroundColor3 = T.accent; bar.BorderSizePixel = 0; bar.Parent = M
-Instance.new("UICorner", bar).CornerRadius = UDim.new(1,0)
-local gr = Instance.new("UIGradient", bar)
-gr.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, T.accent), ColorSequenceKeypoint.new(1, T.accent2)})
-
-local ttl = Instance.new("TextLabel")
-ttl.Size = UDim2.new(1,-24,0,24); ttl.Position = UDim2.fromOffset(14,16)
-ttl.BackgroundTransparency = 1; ttl.Text = "KONTRA CLIENT v4"
-ttl.Font = Enum.Font.GothamBold; ttl.TextSize = 16; ttl.TextColor3 = T.text
-ttl.TextXAlignment = Enum.TextXAlignment.Left; ttl.Parent = M
-
-local stl = Instance.new("TextLabel")
-stl.Size = UDim2.new(1,-24,0,14); stl.Position = UDim2.fromOffset(14,37)
-stl.BackgroundTransparency = 1; stl.Text = "[RShift] Toggle  •  Drag to move"
-stl.Font = Enum.Font.Gotham; stl.TextSize = 10; stl.TextColor3 = T.sub
-stl.TextXAlignment = Enum.TextXAlignment.Left; stl.Parent = M
-
-local SL = Instance.new("ScrollingFrame")
-SL.Size = UDim2.new(1,-16,1,-62); SL.Position = UDim2.fromOffset(8,56)
-SL.BackgroundTransparency = 1; SL.BorderSizePixel = 0; SL.ScrollBarThickness = 3
-SL.ScrollBarImageColor3 = T.accent; SL.Parent = M
-
-local LL = Instance.new("UIListLayout"); LL.Padding = UDim.new(0,4); LL.SortOrder = Enum.SortOrder.LayoutOrder; LL.Parent = SL
-LL:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    SL.CanvasSize = UDim2.new(0,0,0,LL.AbsoluteContentSize.Y + 12)
+local trailActive = false
+CreateToggle("Character Motion Trail", false, function(v)
+    trailActive = v
+    if v then MakePlayerTrail(LocalPlayer.Character)
+    else if trailInst then trailInst:Destroy() trailInst = nil end end
 end)
 
-local dg, ds, dp = false, nil, nil
-M.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then
-    dg = true; ds = i.Position; dp = M.Position
-    i.Changed:Connect(function() if i.UserInputState == Enum.UserInputState.End then dg = false end end)
-end end)
-C(UIS.InputChanged:Connect(function(i) if dg and i.UserInputType == Enum.UserInputType.MouseMovement then
-    local d = i.Position - ds; M.Position = UDim2.new(dp.X.Scale, dp.X.Offset+d.X, dp.Y.Scale, dp.Y.Offset+d.Y)
-end end))
-C(UIS.InputBegan:Connect(function(i,g) if not g and i.KeyCode == Enum.KeyCode.RightShift then M.Visible = not M.Visible end end))
-
-local ord = 0
-local function NO() ord = ord+1 return ord end
-
-local function Section(txt)
-    local f = Instance.new("Frame"); f.Size = UDim2.new(1,0,0,20); f.BackgroundTransparency = 1; f.LayoutOrder = NO(); f.Parent = SL
-    local l = Instance.new("TextLabel"); l.Size = UDim2.new(1,-8,1,0); l.Position = UDim2.fromOffset(4,0)
-    l.BackgroundTransparency = 1; l.Font = Enum.Font.GothamBold; l.TextSize = 10
-    l.TextColor3 = T.accent; l.TextXAlignment = Enum.TextXAlignment.Left; l.Text = "━  "..txt:upper(); l.Parent = f
-    local ln = Instance.new("Frame"); ln.Size = UDim2.new(1,-8,0,1); ln.Position = UDim2.new(0,4,1,-1)
-    ln.BackgroundColor3 = T.dim; ln.BackgroundTransparency = 0.5; ln.BorderSizePixel = 0; ln.Parent = f
-end
-
-local function Toggle(name, def, cb)
-    local st = def
-    local btn = Instance.new("TextButton"); btn.Size = UDim2.new(1,-4,0,32)
-    btn.BackgroundColor3 = T.card; btn.BorderSizePixel = 0; btn.Text = ""; btn.AutoButtonColor = false
-    btn.LayoutOrder = NO(); btn.Parent = SL
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,7)
-
-    local lbl = Instance.new("TextLabel"); lbl.Size = UDim2.new(1,-54,1,0); lbl.Position = UDim2.fromOffset(10,0)
-    lbl.BackgroundTransparency = 1; lbl.Text = name; lbl.Font = Enum.Font.GothamMedium; lbl.TextSize = 11
-    lbl.TextColor3 = T.text; lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.Parent = btn
-
-    local tr = Instance.new("Frame"); tr.Size = UDim2.fromOffset(32,16)
-    tr.Position = UDim2.new(1,-42,0.5,-8); tr.BackgroundColor3 = st and T.accent or T.dim
-    tr.BorderSizePixel = 0; tr.Parent = btn
-    Instance.new("UICorner", tr).CornerRadius = UDim.new(1,0)
-
-    local kn = Instance.new("Frame"); kn.Size = UDim2.fromOffset(12,12)
-    kn.Position = st and UDim2.fromOffset(17,2) or UDim2.fromOffset(3,2)
-    kn.BackgroundColor3 = Color3.new(1,1,1); kn.BorderSizePixel = 0; kn.Parent = tr
-    Instance.new("UICorner", kn).CornerRadius = UDim.new(1,0)
-
-    btn.MouseButton1Click:Connect(function()
-        st = not st
-        Tween:Create(tr, TweenInfo.new(0.15), {BackgroundColor3 = st and T.accent or T.dim}):Play()
-        Tween:Create(kn, TweenInfo.new(0.15), {Position = st and UDim2.fromOffset(17,2) or UDim2.fromOffset(3,2)}):Play()
-        pcall(cb, st)
-    end)
-    btn.MouseEnter:Connect(function() Tween:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = T.hover}):Play() end)
-    btn.MouseLeave:Connect(function() Tween:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = T.card}):Play() end)
-    if def then pcall(cb, true) end
-end
-
--- ══════════════════════════════════════════
---  ВСЕ ПУНКТЫ
--- ══════════════════════════════════════════
-
-Section("Weapon Skins")
-Toggle("Neon Cyber Pink", false, function(v) skinOn=v; discoOn=false; skinCol=Color3.fromRGB(255,45,120); skinMat=Enum.Material.Neon end)
-Toggle("Ice Diamond", false, function(v) skinOn=v; discoOn=false; skinCol=Color3.fromRGB(120,220,255); skinMat=Enum.Material.Glass end)
-Toggle("Gold Prestige", false, function(v) skinOn=v; discoOn=false; skinCol=Color3.fromRGB(255,195,40); skinMat=Enum.Material.SmoothPlastic end)
-Toggle("ForceField Galaxy", false, function(v) skinOn=v; discoOn=false; skinCol=Color3.fromRGB(140,40,255); skinMat=Enum.Material.ForceField end)
-Toggle("Lava Inferno", false, function(v) skinOn=v; discoOn=false; skinCol=Color3.fromRGB(255,80,20); skinMat=Enum.Material.Neon end)
-Toggle("Emerald Toxic", false, function(v) skinOn=v; discoOn=false; skinCol=Color3.fromRGB(40,255,80); skinMat=Enum.Material.Neon end)
-Toggle("RGB Rainbow Disco", false, function(v) discoOn=v; if v then skinOn=false end end)
-
-Section("HUD & Info")
-Toggle("Target HUD", true, function(v) thOn=v end)
-Toggle("Spectator List", false, function(v) SP.Visible=v end)
-Toggle("Watermark (FPS/Ping)", true, function(v) WM.Visible=v end)
-Toggle("Footstep Sound Arrows", false, function(v) arrowOn=v end)
-Toggle("Custom Crosshair", false, function(v) CrosshairFrame.Visible=v end)
-
-Section("Movement")
-Toggle("Auto Bunnyhop (Hold Space)", false, function(v) bhopOn=v end)
-
-Section("Screen Effects")
-Toggle("Vignette (Dark Edges)", false, function(v) Vignette.Visible=v end)
-Toggle("CRT Scanlines Overlay", false, function(v) Scanlines.Visible=v end)
-Toggle("Damage Flash (Red Screen)", false, function(v)
-    dmgFlashOn = v
-    if v and LP.Character then HookDamageFlash(LP.Character) end
-end)
-
-Section("World Visuals")
-
-local atmo = nil
-Toggle("Purple Cyberpunk Fog", false, function(v)
-    if v then Lighting.FogColor=Color3.fromRGB(40,12,75); Lighting.FogStart=0; Lighting.FogEnd=160
-        atmo = AddFX("Atmosphere",{Density=0.4,Color=Color3.fromRGB(110,45,200),Haze=2})
-    else Lighting.FogColor=O.FogC; Lighting.FogStart=O.FogS; Lighting.FogEnd=O.FogE; atmo=RemFX(atmo) end
-end)
-
-local blm, blr = nil, nil
-Toggle("Cinematic Bloom & Blur", false, function(v)
-    if v then blm=AddFX("BloomEffect",{Intensity=1.3,Size=22,Threshold=0.8}); blr=AddFX("BlurEffect",{Size=2.5})
-    else blm=RemFX(blm); blr=RemFX(blr) end
-end)
-
-local cc = nil
-Toggle("Vibrant HDR Colors", false, function(v)
-    if v then cc=AddFX("ColorCorrectionEffect",{Brightness=0.04,Contrast=0.22,Saturation=0.45})
-    else cc=RemFX(cc) end
-end)
-
-local sr = nil
-Toggle("Sun Rays (God Rays)", false, function(v)
-    if v then sr=AddFX("SunRaysEffect",{Intensity=0.12,Spread=0.8}) else sr=RemFX(sr) end
-end)
-
-local dof = nil
-Toggle("Depth of Field (Bokeh)", false, function(v)
-    if v then dof=AddFX("DepthOfFieldEffect",{FarIntensity=0.2,FocusDistance=30,InFocusRadius=50})
-    else dof=RemFX(dof) end
-end)
-
-Toggle("Midnight Moon", false, function(v) Lighting.ClockTime = v and 0 or O.Clock end)
-Toggle("Fullbright (No Shadows)", false, function(v)
-    if v then Lighting.Brightness=3; Lighting.ClockTime=12; Lighting.FogEnd=100000; Lighting.GlobalShadows=false
-    else Lighting.Brightness=O.Bright; Lighting.ClockTime=O.Clock; Lighting.FogEnd=O.FogE; Lighting.GlobalShadows=O.Shadow end
-end)
-
-Section("Character FX")
-
-Toggle("Purple Starlight Aura", false, function(v)
-    if v then local ch=LP.Character; if ch and ch:FindFirstChild("HumanoidRootPart") then
-        local e=Instance.new("ParticleEmitter"); e.Name="PurpleAura"; e.Texture="rbxassetid://243098098"
-        e.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(170,90,255)),ColorSequenceKeypoint.new(1,Color3.fromRGB(70,190,255))})
-        e.Size=NumberSequence.new({NumberSequenceKeypoint.new(0,0.3),NumberSequenceKeypoint.new(1,0)})
-        e.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,0),NumberSequenceKeypoint.new(1,1)})
-        e.Lifetime=NumberRange.new(0.7,1.2); e.Rate=20; e.Speed=NumberRange.new(1.5,3)
-        e.SpreadAngle=Vector2.new(360,360); e.Parent=ch.HumanoidRootPart
-    end else local ch=LP.Character; if ch then
-        for _,d in ipairs(ch:GetDescendants()) do if d.Name=="PurpleAura" then d:Destroy() end end
-    end end
-end)
-
-Toggle("Skull Flame Aura", false, function(v)
-    if v then local ch=LP.Character; if ch and ch:FindFirstChild("HumanoidRootPart") then
-        local e=Instance.new("ParticleEmitter"); e.Name="SkullAura"; e.Texture="rbxassetid://6031075938"
-        e.Color=ColorSequence.new(Color3.fromRGB(255,70,70))
-        e.Size=NumberSequence.new({NumberSequenceKeypoint.new(0,0.45),NumberSequenceKeypoint.new(1,0)})
-        e.Lifetime=NumberRange.new(0.5,1); e.Rate=16; e.Speed=NumberRange.new(2,4)
-        e.SpreadAngle=Vector2.new(360,360); e.Parent=ch.HumanoidRootPart
-    end else local ch=LP.Character; if ch then
-        for _,d in ipairs(ch:GetDescendants()) do if d.Name=="SkullAura" then d:Destroy() end end
-    end end
-end)
-
-Toggle("Character Trail", false, function(v)
-    trailOn = v
-    if v then MakeTrail(LP.Character) else KillTrail() end
-end)
-
-Toggle("Body Glow Light", false, function(v)
-    glowOn = v
-    if v then MakeGlow(LP.Character) else if glowLight then glowLight:Destroy() glowLight=nil end end
-end)
-
-Toggle("RGB Body Glow", false, function(v)
+local purpleAura = nil
+CreateToggle("Purple Starlight Aura", false, function(v)
     if v then
-        MakeGlow(LP.Character)
-        glowConn = Run.RenderStepped:Connect(function()
-            if glowLight and glowLight.Parent then
-                glowLight.Color = Color3.fromHSV((os.clock()*0.5)%1, 0.9, 1)
-            end
-        end)
-        C(glowConn)
-    else
-        if glowConn then glowConn:Disconnect() glowConn=nil end
-        if glowLight then glowLight:Destroy() glowLight=nil end
-    end
-end)
-
--- Respawn hooks
-LP.CharacterAdded:Connect(function(char)
-    task.wait(1)
-    if trailOn then MakeTrail(char) end
-    if glowOn then MakeGlow(char) end
-    if dmgFlashOn then HookDamageFlash(char) end
-end)
--- ══════════════════════════════════════════
---  HEAD DOT MARKERS (кружок над головой)
--- ══════════════════════════════════════════
-local dotsOn = false
-local dotFolder = Instance.new("Folder")
-dotFolder.Name = "HeadDots"
-dotFolder.Parent = G
-
-local function AddDot(char, plr)
-    if plr == LP then return end
-    if not char then return end
-    local head = char:WaitForChild("Head", 5)
-    if not head then return end
-
-    -- Удаляем старый если есть
-    local old = head:FindFirstChild("DotGui")
-    if old then old:Destroy() end
-
-    local bb = Instance.new("BillboardGui")
-    bb.Name = "DotGui"
-    bb.Adornee = head
-    bb.Size = UDim2.fromOffset(12, 12)
-    bb.StudsOffset = Vector3.new(0, 2.5, 0)
-    bb.AlwaysOnTop = false  -- НЕ видно сквозь стены
-    bb.LightInfluence = 0
-    bb.Parent = head
-
-    local circle = Instance.new("Frame")
-    circle.Size = UDim2.new(1, 0, 1, 0)
-    circle.BackgroundColor3 = Color3.fromRGB(140, 85, 255)
-    circle.BorderSizePixel = 0
-    circle.Parent = bb
-
-    Instance.new("UICorner", circle).CornerRadius = UDim.new(1, 0)
-
-    local stroke = Instance.new("UIStroke")
-    stroke.Thickness = 1
-    stroke.Color = Color3.fromRGB(255, 255, 255)
-    stroke.Transparency = 0.4
-    stroke.Parent = circle
-end
-
-local function RemoveDot(char)
-    if not char then return end
-    local head = char:FindFirstChild("Head")
-    if head then
-        local d = head:FindFirstChild("DotGui")
-        if d then d:Destroy() end
-    end
-end
-
-local function RemoveAllDots()
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= LP and plr.Character then
-            RemoveDot(plr.Character)
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            purpleAura = Instance.new("ParticleEmitter")
+            purpleAura.Texture = "rbxassetid://243098098"
+            purpleAura.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(170, 90, 255)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(70, 190, 255))
+            })
+            purpleAura.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 0)})
+            purpleAura.Lifetime = NumberRange.new(0.7, 1.2)
+            purpleAura.Rate = 20
+            purpleAura.Speed = NumberRange.new(1.5, 3)
+            purpleAura.SpreadAngle = Vector2.new(360, 360)
+            purpleAura.Parent = char.HumanoidRootPart
         end
+    else
+        if purpleAura then purpleAura:Destroy() purpleAura = nil end
     end
-end
-
-local function SetupDotsForPlayer(plr)
-    if plr == LP then return end
-    plr.CharacterAdded:Connect(function(char)
-        task.wait(0.5)
-        if dotsOn then AddDot(char, plr) end
-    end)
-    if plr.Character and dotsOn then
-        AddDot(plr.Character, plr)
-    end
-end
-
-for _, plr in ipairs(Players:GetPlayers()) do SetupDotsForPlayer(plr) end
-Players.PlayerAdded:Connect(SetupDotsForPlayer)
--- ══════════════════════════════════════════
---  UNLOAD
--- ══════════════════════════════════════════
-Section("")
-
-local ub = Instance.new("TextButton"); ub.Size = UDim2.new(1,-4,0,36)
-ub.BackgroundColor3 = T.red; ub.BorderSizePixel = 0; ub.Text = "  UNLOAD SCRIPT"
-ub.Font = Enum.Font.GothamBold; ub.TextSize = 12; ub.TextColor3 = Color3.new(1,1,1)
-ub.LayoutOrder = NO(); ub.Parent = SL
-Instance.new("UICorner", ub).CornerRadius = UDim.new(0,8)
-
-ub.MouseButton1Click:Connect(function()
-    for _,c in ipairs(_C) do pcall(function() c:Disconnect() end) end
-    for _,e in ipairs(_FX) do pcall(function() e:Destroy() end) end
-    KillTrail()
-    pcall(function() if glowLight then glowLight:Destroy() end end)
-    pcall(function() if glowConn then glowConn:Disconnect() end end)
-
-    Lighting.FogColor=O.FogC; Lighting.FogStart=O.FogS; Lighting.FogEnd=O.FogE
-    Lighting.ClockTime=O.Clock; Lighting.Brightness=O.Bright; Lighting.GlobalShadows=O.Shadow
-
-    G:Destroy()
-    print("[Kontra v4] Unloaded.")
 end)
 
-print("[Kontra v4] Loaded — "..ord.." items.")
+local skullAura = nil
+CreateToggle("Skull Flame Aura", false, function(v)
+    if v then
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            skullAura = Instance.new("ParticleEmitter")
+            skullAura.Texture = "rbxassetid://6031075938"
+            skullAura.Color = ColorSequence.new(Color3.fromRGB(255, 70, 70))
+            skullAura.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.45), NumberSequenceKeypoint.new(1, 0)})
+            skullAura.Lifetime = NumberRange.new(0.5, 1)
+            skullAura.Rate = 16
+            skullAura.Speed = NumberRange.new(2, 4)
+            skullAura.SpreadAngle = Vector2.new(360, 360)
+            skullAura.Parent = char.HumanoidRootPart
+        end
+    else
+        if skullAura then skullAura:Destroy() skullAura = nil end
+    end
+end)
+
+-- Восстановление эффектов при респавне
+LocalPlayer.CharacterAdded:Connect(function(char)
+    task.wait(1)
+    if trailActive then MakePlayerTrail(char) end
+end)
+
+-- ─── КНОПКА ВЫГРУЗКИ (UNLOAD) ───
+CreateSection("")
+
+local UnloadBtn = Instance.new("TextButton")
+UnloadBtn.Size = UDim2.new(1, -4, 0, 36)
+UnloadBtn.BackgroundColor3 = Theme.Red
+UnloadBtn.BorderSizePixel = 0
+UnloadBtn.Text = "UNLOAD / DESTROY SCRIPT"
+UnloadBtn.Font = Enum.Font.GothamBold
+UnloadBtn.TextSize = 12
+UnloadBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+UnloadBtn.LayoutOrder = NextOrder()
+UnloadBtn.Parent = ScrollList
+Instance.new("UICorner", UnloadBtn).CornerRadius = UDim.new(0, 8)
+
+UnloadBtn.MouseButton1Click:Connect(function()
+    for _, conn in ipairs(Connections) do
+        pcall(function() conn:Disconnect() end)
+    end
+    for _, effect in ipairs(LightingEffects) do
+        pcall(function() effect:Destroy() end)
+    end
+
+    if trailInst then pcall(function() trailInst:Destroy() end) end
+    if purpleAura then pcall(function() purpleAura:Destroy() end) end
+    if skullAura then pcall(function() skullAura:Destroy() end) end
+    if snowEmitter then pcall(function() snowEmitter:Destroy() end) end
+    if sakuraEmitter then pcall(function() sakuraEmitter:Destroy() end) end
+
+    ClearAllHeadDots()
+
+    Lighting.FogColor = OriginalSettings.FogColor
+    Lighting.FogStart = OriginalSettings.FogStart
+    Lighting.FogEnd = OriginalSettings.FogEnd
+    Lighting.ClockTime = OriginalSettings.ClockTime
+    Lighting.Brightness = OriginalSettings.Brightness
+    Lighting.GlobalShadows = OriginalSettings.GlobalShadows
+    Lighting.OutdoorAmbient = OriginalSettings.OutdoorAmbient
+
+    ScreenGui:Destroy()
+    print("[Kontra v5] Unloaded cleanly!")
+end)
+
+print("[Kontra v5] Successfully loaded all systems and visuals!")
